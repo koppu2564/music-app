@@ -1,0 +1,197 @@
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+    <title>すぽてぃふぁい</title>
+  
+    <!-- PWA用 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+  
+  
+    <!-- オフライン対応のService Worker 登録用スクリプト（本体は body 終了前に書くのが通例） -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('Service Worker registered:', reg.scope))
+            .catch(err => console.warn('SW registration failed:', err));
+        });
+      }
+    </script>
+  
+    <!-- モバイルでの表示最適化や自動再生制御対策にも -->
+    <meta name="format-detection" content="telephone=no">
+
+    <style>
+      /* ボタンをリスト状に並べる例 */
+      #music-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      #music-list li {
+        margin: 0.5em 0;
+      }
+      #music-list button {
+        padding: 0.5em 1em;
+        font-size: 1em;
+        cursor: pointer;
+      }
+    </style>
+  
+
+</head>
+  <body>
+    <label>Cloud name: <input id="cloudNameInput"></label><br>
+    <label>API Key: <input id="apiKeyInput"></label><br>
+    <label>Upload Preset: <input id="presetInput"></label><br>
+    <button onclick="saveConfig()">保存</button>
+
+    
+    <form id="upload-form">
+        <input type="file" id="file-input" accept="audio/*">
+        <button type="submit">アップロード</button>
+    </form>
+
+    <audio id="player" controls style="width:100%; margin-top:1em;"></audio>
+
+    <button onclick="startRandomMusic()">ランダム再生スタート</button>
+
+    <button onclick="listMusic()">音楽を表示</button>
+    <ul id="music-list"></ul>
+   
+      
+    <script>
+        const cloudName = 'dmmn8ment'
+        const apiKey = '221232376494836'
+        const uploadPreset = 'musicupload'
+
+        let musicList   = [];
+    
+      window.onload = function () {
+        const saved = JSON.parse(localStorage.getItem('cloudinaryConfig'));
+        if (saved) {
+          document.getElementById('cloudNameInput').value = saved.cloudName;
+          document.getElementById('apiKeyInput').value = saved.apiKey;
+          document.getElementById('presetInput').value = saved.uploadPreset;
+        }
+      };
+
+      function saveConfig() {
+       const config = {
+        cloudName: document.getElementById('cloudNameInput').value,
+        apiKey: document.getElementById('apiKeyInput').value,
+        uploadPreset: document.getElementById('presetInput').value
+        };
+       localStorage.setItem('cloudinaryConfig', JSON.stringify(config));
+       alert('保存しました！');
+      }
+
+      
+      
+      document.getElementById('upload-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = document.getElementById('file-input').files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', uploadPreset);
+        formData.append('tags', 'music');
+      
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
+          method: 'POST',
+          body: formData
+        });
+      
+        const data = await res.json();
+        alert('アップロード完了: ' + data.original_filename);
+      });
+
+      const tag = 'music' // 取得したいタグ名
+
+      async function listMusic() {
+      const url = `https://res.cloudinary.com/${cloudName}/video/list/${tag}.json`;
+      let data;
+      try {
+        const res = await fetch(url);
+        data = await res.json();
+      } catch (err) {
+        console.error('リスト取得エラー', err);
+        return;
+      }
+
+      const list = document.getElementById('music-list');
+      list.innerHTML = '';
+
+      data.resources.forEach(file => {
+        // <li><button> を作成
+        const li     = document.createElement('li');
+        const button = document.createElement('button');
+
+        button.textContent = file.public_id;    // ボタンのラベル
+        button.onclick     = () => playMusic(file);  // 再生関数呼び出し
+
+        li.appendChild(button);
+        list.appendChild(li);
+      });
+    }
+
+    function playMusic(file) {
+      const player = document.getElementById('player');
+      // secure_url のまま再生可能ならそのまま、なければ .mp3 拡張子を付ける
+      player.src = file.secure_url || 
+                   `https://res.cloudinary.com/${cloudName}/video/upload/${file.public_id}.mp3`;
+      player.play();
+
+      player.onended = () => {
+        playRandomMusic();
+      };
+    }
+
+    async function fetchMusicList() {
+      const url = `https://res.cloudinary.com/${cloudName}/video/list/${tag}.json`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        return data.resources;
+      } catch (err) {
+        console.error('リスト取得エラー', err);
+        return [];
+      }
+    }
+
+    async function startRandomMusic() {
+      musicList = await fetchMusicList();
+      if (musicList.length === 0) {
+        alert('音楽ファイルが見つかりませんでした。');
+        return;
+      }
+      playRandomMusic();
+    }
+
+    function playRandomMusic() {
+      if (musicList.length === 0) return;
+
+      const player = document.getElementById('player');
+      const randomIndex = Math.floor(Math.random() * musicList.length);
+      const file = musicList[randomIndex];
+
+      player.src = file.secure_url || 
+                   `https://res.cloudinary.com/${cloudName}/video/upload/${file.public_id}.mp3`;
+      player.play();
+
+      // 曲が終わったら次のランダム曲を再生
+      player.onended = () => {
+        playRandomMusic();
+      };
+    }
+
+      
+
+
+
+    </script>
+      
+  </body>

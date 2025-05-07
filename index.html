@@ -76,6 +76,9 @@
           document.getElementById('cloudNameInput').value = saved.cloudName;
           document.getElementById('apiKeyInput').value = saved.apiKey;
           document.getElementById('presetInput').value = saved.uploadPreset;
+             cloudName = saved.cloudName;
+      uploadPreset = saved.uploadPreset;
+             apiKey = saved.apiKey;
         }
       };
 
@@ -86,6 +89,9 @@
         uploadPreset: document.getElementById('presetInput').value
         };
        localStorage.setItem('cloudinaryConfig', JSON.stringify(config));
+          cloudName = config.cloudName;
+    uploadPreset = config.uploadPreset;
+          apiKey = config.apiKey;
        alert('保存しました！');
       }
 
